@@ -1,26 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AD Eternity Challenges Tracker</title>
-    
-    <!-- PWA Meta Tags -->
+
+    <!-- PWA / Favicon Tags -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#121212">
-    <link rel="apple-touch-icon" href="icon-192.png">
+
+    <!-- Apple Touch Icon (for iOS Home Screen) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+
+    <!-- Standard Favicons (for Desktop Tabs) -->
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-
     <style>
         :root {
             --bg-color: #121212;
             --card-bg: #1e1e1e;
             --text-primary: #e0e0e0;
             --text-secondary: #a0a0a0;
-            --accent: #2e7d32; /* Green */
+            --accent: #2e7d32;
+            /* Green */
             --accent-hover: #1b5e20;
-            --copy-btn: #1565c0; /* Blue */
+            --copy-btn: #1565c0;
+            /* Blue */
             --border-color: #333;
         }
 
@@ -43,7 +52,8 @@
         h1 {
             margin: 0;
             font-size: 1.5rem;
-            color: #b388ff; /* Antimatter Purple-ish */
+            color: #b388ff;
+            /* Antimatter Purple-ish */
         }
 
         .status-msg {
@@ -138,7 +148,7 @@
             font-size: 1rem;
             word-wrap: break-word;
         }
-        
+
         .card.done .task-text {
             text-decoration: line-through;
             color: var(--text-secondary);
@@ -192,230 +202,233 @@
             .card {
                 padding: 12px;
             }
+
             .task-text {
                 font-size: 0.95rem;
             }
         }
     </style>
 </head>
+
 <body>
 
-<header>
-    <h1>AD: Eternity Challenges</h1>
-</header>
+    <header>
+        <h1>AD: Eternity Challenges</h1>
+    </header>
 
-<div id="app">
-    <div id="loading" class="status-msg">Loading data.csv...</div>
-    <div id="error-container"></div>
-    <div id="challenge-list"></div>
-</div>
+    <div id="app">
+        <div id="loading" class="status-msg">Loading data.csv...</div>
+        <div id="error-container"></div>
+        <div id="challenge-list"></div>
+    </div>
 
-<script>
-    // --- PWA REGISTRATION ---
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker registered', reg))
-                .catch(err => console.log('Service Worker registration failed', err));
-        });
-    }
+    <script>
+        // --- PWA REGISTRATION ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker registered', reg))
+                    .catch(err => console.log('Service Worker registration failed', err));
+            });
+        }
 
-    const CSV_FILE = 'data.csv';
-    const STORAGE_KEY = 'ad_ec_tracker_completed_v1';
-    
-    let completedIndices = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+        const CSV_FILE = 'data.csv';
+        const STORAGE_KEY = 'ad_ec_tracker_completed_v1';
 
-    async function init() {
-        const listContainer = document.getElementById('challenge-list');
-        const loadingEl = document.getElementById('loading');
-        const errorContainer = document.getElementById('error-container');
+        let completedIndices = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
 
-        try {
-            const response = await fetch(CSV_FILE);
-            
-            if (!response.ok) {
-                throw new Error(`Failed to fetch ${CSV_FILE} (Status: ${response.status})`);
-            }
+        async function init() {
+            const listContainer = document.getElementById('challenge-list');
+            const loadingEl = document.getElementById('loading');
+            const errorContainer = document.getElementById('error-container');
 
-            const text = await response.text();
-            const data = parseCSV(text);
-            
-            const validRows = [];
-            
-            // Start from index 2 to skip headers
-            for(let i = 2; i < data.length; i++) {
-                const row = data[i];
-                if (row.length >= 3) {
-                    const task = row[1] ? row[1].trim() : '';
-                    const tree = row[2] ? row[2].trim() : '';
-                    
-                    if (task) {
-                        validRows.push({
-                            id: i,
-                            task: task,
-                            tree: tree
-                        });
+            try {
+                const response = await fetch(CSV_FILE);
+
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch ${CSV_FILE} (Status: ${response.status})`);
+                }
+
+                const text = await response.text();
+                const data = parseCSV(text);
+
+                const validRows = [];
+
+                // Start from index 2 to skip headers
+                for (let i = 2; i < data.length; i++) {
+                    const row = data[i];
+                    if (row.length >= 3) {
+                        const task = row[1] ? row[1].trim() : '';
+                        const tree = row[2] ? row[2].trim() : '';
+
+                        if (task) {
+                            validRows.push({
+                                id: i,
+                                task: task,
+                                tree: tree
+                            });
+                        }
                     }
                 }
-            }
 
-            renderList(validRows);
-            loadingEl.style.display = 'none';
-            scrollToProgress();
+                renderList(validRows);
+                loadingEl.style.display = 'none';
+                scrollToProgress();
 
-        } catch (err) {
-            loadingEl.style.display = 'none';
-            errorContainer.innerHTML = `
+            } catch (err) {
+                loadingEl.style.display = 'none';
+                errorContainer.innerHTML = `
                 <div class="error">
                     <strong>Error:</strong> ${err.message}<br><br>
                     <em>Ensure data.csv is in the same folder and the site is loaded via HTTPS.</em>
                 </div>
             `;
+            }
         }
-    }
 
-    function parseCSV(text) {
-        const rows = [];
-        let currentRow = [];
-        let currentVal = '';
-        let insideQuotes = false;
-        
-        text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        function parseCSV(text) {
+            const rows = [];
+            let currentRow = [];
+            let currentVal = '';
+            let insideQuotes = false;
 
-        for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            const nextChar = text[i + 1];
+            text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-            if (char === '"') {
-                if (insideQuotes && nextChar === '"') {
-                    currentVal += '"';
-                    i++; 
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const nextChar = text[i + 1];
+
+                if (char === '"') {
+                    if (insideQuotes && nextChar === '"') {
+                        currentVal += '"';
+                        i++;
+                    } else {
+                        insideQuotes = !insideQuotes;
+                    }
+                } else if (char === ',' && !insideQuotes) {
+                    currentRow.push(currentVal);
+                    currentVal = '';
+                } else if (char === '\n' && !insideQuotes) {
+                    currentRow.push(currentVal);
+                    rows.push(currentRow);
+                    currentRow = [];
+                    currentVal = '';
                 } else {
-                    insideQuotes = !insideQuotes;
+                    currentVal += char;
                 }
-            } else if (char === ',' && !insideQuotes) {
-                currentRow.push(currentVal);
-                currentVal = '';
-            } else if (char === '\n' && !insideQuotes) {
+            }
+
+            if (currentVal || currentRow.length > 0) {
                 currentRow.push(currentVal);
                 rows.push(currentRow);
-                currentRow = [];
-                currentVal = '';
-            } else {
-                currentVal += char;
-            }
-        }
-        
-        if (currentVal || currentRow.length > 0) {
-            currentRow.push(currentVal);
-            rows.push(currentRow);
-        }
-        
-        return rows;
-    }
-
-    function renderList(items) {
-        const container = document.getElementById('challenge-list');
-        container.innerHTML = '';
-
-        items.forEach(item => {
-            const isDone = completedIndices.has(item.id);
-            
-            const card = document.createElement('div');
-            card.className = `card ${isDone ? 'done' : ''}`;
-            card.dataset.id = item.id;
-
-            const header = document.createElement('div');
-            header.className = 'card-header';
-
-            const checkWrapper = document.createElement('div');
-            checkWrapper.className = 'checkbox-wrapper';
-            
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = isDone;
-            checkbox.onchange = (e) => toggleStatus(item.id, e.target.checked, card);
-            
-            checkWrapper.appendChild(checkbox);
-
-            const textDiv = document.createElement('div');
-            textDiv.className = 'task-text';
-            textDiv.textContent = item.task;
-            
-            textDiv.onclick = () => {
-                checkbox.checked = !checkbox.checked;
-                toggleStatus(item.id, checkbox.checked, card);
-            };
-            textDiv.style.cursor = 'pointer';
-
-            header.appendChild(checkWrapper);
-            header.appendChild(textDiv);
-
-            if (item.tree) {
-                const actions = document.createElement('div');
-                actions.className = 'actions';
-
-                const treePreview = document.createElement('div');
-                treePreview.className = 'tree-preview';
-                treePreview.textContent = item.tree;
-
-                const copyBtn = document.createElement('button');
-                copyBtn.className = 'copy-btn';
-                copyBtn.textContent = 'Copy Tree';
-                copyBtn.onclick = () => copyToClipboard(item.tree, copyBtn);
-
-                actions.appendChild(treePreview);
-                actions.appendChild(copyBtn);
-                card.appendChild(header);
-                card.appendChild(actions);
-            } else {
-                card.appendChild(header);
             }
 
-            container.appendChild(card);
-        });
-    }
-
-    function toggleStatus(id, isChecked, cardEl) {
-        if (isChecked) {
-            completedIndices.add(id);
-            cardEl.classList.add('done');
-        } else {
-            completedIndices.delete(id);
-            cardEl.classList.remove('done');
+            return rows;
         }
-        localStorage.setItem(STORAGE_KEY, JSON.stringify([...completedIndices]));
-    }
 
-    function scrollToProgress() {
-        if (completedIndices.size === 0) return;
-        const lastCheckedId = Math.max(...completedIndices);
-        const targetCard = document.querySelector(`.card[data-id="${lastCheckedId}"]`);
-        if (targetCard) {
-            setTimeout(() => {
-                targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
+        function renderList(items) {
+            const container = document.getElementById('challenge-list');
+            container.innerHTML = '';
+
+            items.forEach(item => {
+                const isDone = completedIndices.has(item.id);
+
+                const card = document.createElement('div');
+                card.className = `card ${isDone ? 'done' : ''}`;
+                card.dataset.id = item.id;
+
+                const header = document.createElement('div');
+                header.className = 'card-header';
+
+                const checkWrapper = document.createElement('div');
+                checkWrapper.className = 'checkbox-wrapper';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.checked = isDone;
+                checkbox.onchange = (e) => toggleStatus(item.id, e.target.checked, card);
+
+                checkWrapper.appendChild(checkbox);
+
+                const textDiv = document.createElement('div');
+                textDiv.className = 'task-text';
+                textDiv.textContent = item.task;
+
+                textDiv.onclick = () => {
+                    checkbox.checked = !checkbox.checked;
+                    toggleStatus(item.id, checkbox.checked, card);
+                };
+                textDiv.style.cursor = 'pointer';
+
+                header.appendChild(checkWrapper);
+                header.appendChild(textDiv);
+
+                if (item.tree) {
+                    const actions = document.createElement('div');
+                    actions.className = 'actions';
+
+                    const treePreview = document.createElement('div');
+                    treePreview.className = 'tree-preview';
+                    treePreview.textContent = item.tree;
+
+                    const copyBtn = document.createElement('button');
+                    copyBtn.className = 'copy-btn';
+                    copyBtn.textContent = 'Copy Tree';
+                    copyBtn.onclick = () => copyToClipboard(item.tree, copyBtn);
+
+                    actions.appendChild(treePreview);
+                    actions.appendChild(copyBtn);
+                    card.appendChild(header);
+                    card.appendChild(actions);
+                } else {
+                    card.appendChild(header);
+                }
+
+                container.appendChild(card);
+            });
         }
-    }
 
-    async function copyToClipboard(text, btnElement) {
-        try {
-            await navigator.clipboard.writeText(text);
-            const originalText = btnElement.textContent;
-            btnElement.textContent = 'Copied!';
-            btnElement.classList.add('copied');
-            setTimeout(() => {
-                btnElement.textContent = originalText;
-                btnElement.classList.remove('copied');
-            }, 1500);
-        } catch (err) {
-            console.error('Failed to copy', err);
-            alert('Could not copy to clipboard. Please select text manually.');
+        function toggleStatus(id, isChecked, cardEl) {
+            if (isChecked) {
+                completedIndices.add(id);
+                cardEl.classList.add('done');
+            } else {
+                completedIndices.delete(id);
+                cardEl.classList.remove('done');
+            }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify([...completedIndices]));
         }
-    }
 
-    init();
-</script>
+        function scrollToProgress() {
+            if (completedIndices.size === 0) return;
+            const lastCheckedId = Math.max(...completedIndices);
+            const targetCard = document.querySelector(`.card[data-id="${lastCheckedId}"]`);
+            if (targetCard) {
+                setTimeout(() => {
+                    targetCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 100);
+            }
+        }
+
+        async function copyToClipboard(text, btnElement) {
+            try {
+                await navigator.clipboard.writeText(text);
+                const originalText = btnElement.textContent;
+                btnElement.textContent = 'Copied!';
+                btnElement.classList.add('copied');
+                setTimeout(() => {
+                    btnElement.textContent = originalText;
+                    btnElement.classList.remove('copied');
+                }, 1500);
+            } catch (err) {
+                console.error('Failed to copy', err);
+                alert('Could not copy to clipboard. Please select text manually.');
+            }
+        }
+
+        init();
+    </script>
 
 </body>
+
 </html>
