@@ -41,7 +41,23 @@ async function init() {
 
         const stored = localStorage.getItem(STORAGE_KEY_DATA);
         if (stored) {
-            currentItems = JSON.parse(stored);
+            const parsed = JSON.parse(stored);
+
+            // Check if this is OLD format (array of integer IDs like [2, 5, 7])
+            if (Array.isArray(parsed) && (parsed.length === 0 || typeof parsed[0] === 'number')) {
+                // MIGRATE: Old format was just an array of completed row indices
+                const completedIndices = new Set(parsed);
+                currentItems = defaultItems.map(item => ({
+                    ...item,
+                    // Old IDs were integers like 2, new IDs are strings like "row-2"
+                    done: completedIndices.has(parseInt(item.id.replace('row-', '')))
+                }));
+                // Save in new format
+                saveData();
+            } else {
+                // New format - array of item objects
+                currentItems = parsed;
+            }
         } else {
             currentItems = JSON.parse(JSON.stringify(defaultItems));
         }
@@ -344,7 +360,8 @@ function parseCSV(text) {
 }
 
 function escapeHtml(text) {
-    return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    if (text == null) return '';
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 function scrollToProgress() {

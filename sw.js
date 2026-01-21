@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ad-tracker-v3'; // Updated for new file structure
+const CACHE_NAME = 'ad-tracker-v5'; // v5: Added old data migration
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
