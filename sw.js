@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ad-tracker-v5'; // v5: Added old data migration
+const CACHE_NAME = 'ad-tracker-v6'; // v6: Mobile long-press drag
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

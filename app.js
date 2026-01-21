@@ -11,9 +11,12 @@ let dragSourceEl = null; // The real element being moved
 let touchOffsetX = 0;
 let touchOffsetY = 0;
 let autoScrollInterval = null;
+let longPressTimer = null;
 
 // Trash zone height when visible (bottom: 30px + height: 60px + some margin)
 const TRASH_ZONE_HEIGHT = 120;
+const LONG_PRESS_DURATION = 300; // ms for long press to trigger drag
+const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
 async function init() {
     const listContainer = document.getElementById('challenge-list');
@@ -109,7 +112,14 @@ function renderList() {
         };
 
         const dragHandle = card.querySelector('.drag-handle');
-        setupPointerDrag(dragHandle, card);
+
+        if (isMobile) {
+            // Mobile: long-press on card to drag
+            setupLongPressDrag(card);
+        } else {
+            // Desktop: use drag handle
+            setupPointerDrag(dragHandle, card);
+        }
 
         if (item.tree) {
             const copyBtn = card.querySelector('.copy-btn');
@@ -244,6 +254,172 @@ function setupPointerDrag(handle, card) {
             rebuildAndSave();
         } else {
             // Just Save Order
+            rebuildAndSave();
+        }
+        dragSourceEl = null;
+    }
+}
+
+// --- Long Press Drag for Mobile ---
+function setupLongPressDrag(card) {
+    let startX, startY;
+    let isDragging = false;
+
+    card.addEventListener('pointerdown', function (e) {
+        // Don't trigger on checkbox, buttons, or editable text
+        if (e.target.matches('input, button, .copy-btn') ||
+            e.target.closest('.task-text')?.hasAttribute('contenteditable')) {
+            return;
+        }
+
+        startX = e.clientX;
+        startY = e.clientY;
+        isDragging = false;
+
+        // Start long press timer
+        longPressTimer = setTimeout(() => {
+            isDragging = true;
+
+            // Haptic feedback if available
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            // Start drag
+            dragSourceEl = card;
+            const rect = card.getBoundingClientRect();
+            touchOffsetX = e.clientX - rect.left;
+            touchOffsetY = e.clientY - rect.top;
+
+            // Create Ghost
+            dragGhost = card.cloneNode(true);
+            dragGhost.classList.add('dragging-ghost');
+            dragGhost.style.width = rect.width + 'px';
+            dragGhost.style.height = rect.height + 'px';
+            const taskText = dragGhost.querySelector('.task-text');
+            if (taskText) taskText.removeAttribute('contenteditable');
+            document.body.appendChild(dragGhost);
+
+            // Mark as placeholder
+            card.classList.add('placeholder');
+
+            // Show trash
+            document.getElementById('trash-zone').classList.add('visible');
+
+            // Position ghost
+            moveGhost(e.clientX, e.clientY);
+
+            // Bind move/up handlers
+            document.addEventListener('pointermove', onLongPressMove, { passive: false });
+            document.addEventListener('pointerup', onLongPressUp);
+            document.addEventListener('pointercancel', onLongPressUp);
+        }, LONG_PRESS_DURATION);
+    });
+
+    card.addEventListener('pointermove', function (e) {
+        // Cancel long press if moved too much before it triggered
+        if (longPressTimer && !isDragging) {
+            const dx = Math.abs(e.clientX - startX);
+            const dy = Math.abs(e.clientY - startY);
+            if (dx > 10 || dy > 10) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+        }
+    });
+
+    card.addEventListener('pointerup', function () {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    });
+
+    card.addEventListener('pointercancel', function () {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+    });
+
+    function onLongPressMove(e) {
+        e.preventDefault();
+        moveGhost(e.clientX, e.clientY);
+
+        const trashZone = document.getElementById('trash-zone');
+        const trashRect = trashZone.getBoundingClientRect();
+
+        if (e.clientY > trashRect.top) {
+            trashZone.classList.add('active');
+            dragGhost.classList.add('deleting');
+            dragSourceEl.style.display = 'none';
+            clearInterval(autoScrollInterval);
+        } else {
+            trashZone.classList.remove('active');
+            dragGhost.classList.remove('deleting');
+            dragSourceEl.style.display = '';
+
+            // Geometric reordering
+            const container = document.getElementById('challenge-list');
+            const siblings = Array.from(container.children);
+
+            let closestElement = null;
+            let minDistance = Infinity;
+
+            siblings.forEach(sibling => {
+                if (sibling === dragSourceEl) return;
+
+                const box = sibling.getBoundingClientRect();
+                const boxCenterY = box.top + box.height / 2;
+                const distance = e.clientY - boxCenterY;
+
+                if (e.clientY > box.top && e.clientY < box.bottom) {
+                    if (Math.abs(distance) < minDistance) {
+                        minDistance = Math.abs(distance);
+                        closestElement = sibling;
+                    }
+                }
+            });
+
+            if (closestElement) {
+                const rect = closestElement.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+
+                if (e.clientY < midY) {
+                    if (dragSourceEl.nextElementSibling !== closestElement) {
+                        container.insertBefore(dragSourceEl, closestElement);
+                    }
+                } else {
+                    if (dragSourceEl.previousElementSibling !== closestElement) {
+                        container.insertBefore(dragSourceEl, closestElement.nextSibling);
+                    }
+                }
+            }
+
+            handleAutoScroll(e.clientY);
+        }
+    }
+
+    function onLongPressUp() {
+        document.removeEventListener('pointermove', onLongPressMove);
+        document.removeEventListener('pointerup', onLongPressUp);
+        document.removeEventListener('pointercancel', onLongPressUp);
+
+        const trashZone = document.getElementById('trash-zone');
+        const isTrash = trashZone.classList.contains('active');
+
+        if (dragGhost) dragGhost.remove();
+        dragGhost = null;
+        if (dragSourceEl) {
+            dragSourceEl.classList.remove('placeholder');
+            dragSourceEl.style.display = '';
+        }
+
+        trashZone.classList.remove('visible', 'active');
+        clearInterval(autoScrollInterval);
+
+        if (isTrash && dragSourceEl) {
+            dragSourceEl.remove();
+            rebuildAndSave();
+        } else {
             rebuildAndSave();
         }
         dragSourceEl = null;
