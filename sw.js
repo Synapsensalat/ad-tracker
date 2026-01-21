@@ -1,14 +1,17 @@
-const CACHE_NAME = 'ad-tracker-v1';
+const CACHE_NAME = 'ad-tracker-v2'; // Changed version number to force update
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './data.csv',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  './android-chrome-192x192.png',
+  './android-chrome-512x512.png',
+  './apple-touch-icon.png',
+  './favicon-16x16.png',
+  './favicon-32x32.png',
+  './favicon.ico'
 ];
 
-// Install Event: Cache files
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -17,13 +20,10 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Fetch Event: Serve from network first, fall back to cache
-// This ensures you get updates if you edit the CSV, but it works offline too.
 self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // If we got a valid response, clone it and update the cache
         if (response && response.status === 200 && response.type === 'basic') {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
@@ -33,7 +33,6 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // If network fails (offline), return from cache
         return caches.match(event.request);
       })
   );
