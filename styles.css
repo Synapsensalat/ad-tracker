@@ -222,33 +222,33 @@ input[type="checkbox"]:checked::after {
 
 #trash-zone {
     position: fixed;
-    bottom: -80px;
+    bottom: -60px;
     left: 50%;
     transform: translateX(-50%);
-    width: 60px;
-    height: 60px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background-color: var(--delete-color);
+    background-color: rgba(211, 47, 47, 0.7);
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    transition: bottom 0.2s ease, transform 0.15s ease;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    transition: bottom 0.2s ease, transform 0.15s ease, background-color 0.15s ease;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 #trash-zone.visible {
-    bottom: 30px;
+    bottom: 15px;
 }
 
 #trash-zone.active {
-    background-color: #b71c1c;
+    background-color: rgba(183, 28, 28, 0.95);
     transform: translateX(-50%) scale(1.15);
 }
 
 #trash-zone .icon {
-    font-size: 1.8rem;
+    font-size: 1.4rem;
 }
 
 @media (max-width: 400px) {
@@ -269,6 +269,13 @@ input[type="checkbox"]:checked::after {
 
     .card {
         touch-action: pan-y;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* Prevent context menu on long press */
+    .card * {
         -webkit-touch-callout: none;
     }
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ad-tracker-v8'; // v8: Touch events for mobile drag
+const CACHE_NAME = 'ad-tracker-v11'; // v11: Both handlers on all cards
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

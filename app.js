@@ -13,10 +13,9 @@ let touchOffsetY = 0;
 let autoScrollInterval = null;
 let longPressTimer = null;
 
-// Trash zone height when visible (bottom: 30px + height: 60px + some margin)
-const TRASH_ZONE_HEIGHT = 120;
+// Trash zone height when visible (bottom: 15px + height: 48px + some margin)
+const TRASH_ZONE_HEIGHT = 90;
 const LONG_PRESS_DURATION = 300; // ms for long press to trigger drag
-const isMobile = window.matchMedia('(max-width: 768px)').matches;
 
 async function init() {
     const listContainer = document.getElementById('challenge-list');
@@ -113,13 +112,13 @@ function renderList() {
 
         const dragHandle = card.querySelector('.drag-handle');
 
-        if (isMobile) {
-            // Mobile: long-press on card to drag
-            setupLongPressDrag(card);
-        } else {
-            // Desktop: use drag handle
+        // Set up BOTH handlers - let the input type determine which fires
+        // Desktop: pointer events on drag handle
+        if (dragHandle) {
             setupPointerDrag(dragHandle, card);
         }
+        // Mobile: touch events on the whole card (long-press)
+        setupLongPressDrag(card);
 
         if (item.tree) {
             const copyBtn = card.querySelector('.copy-btn');
@@ -263,8 +262,13 @@ function setupPointerDrag(handle, card) {
 // --- Long Press Drag for Mobile (using touch events) ---
 function setupLongPressDrag(card) {
     let startX, startY;
+    let lastX, lastY; // Track current position
     let isDragging = false;
-    let currentTouch = null;
+
+    // Prevent context menu on long press
+    card.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+    });
 
     card.addEventListener('touchstart', function (e) {
         // Don't trigger on checkbox or buttons
@@ -275,8 +279,9 @@ function setupLongPressDrag(card) {
         const touch = e.touches[0];
         startX = touch.clientX;
         startY = touch.clientY;
+        lastX = startX;
+        lastY = startY;
         isDragging = false;
-        currentTouch = touch;
 
         // Start long press timer
         longPressTimer = setTimeout(() => {
@@ -285,17 +290,14 @@ function setupLongPressDrag(card) {
             // Prevent text from being focused - blur any focused element
             document.activeElement?.blur();
 
-            // Prevent context menu
-            e.preventDefault();
-
             // Haptic feedback if available
             if (navigator.vibrate) navigator.vibrate(50);
 
             // Start drag
             dragSourceEl = card;
             const rect = card.getBoundingClientRect();
-            touchOffsetX = startX - rect.left;
-            touchOffsetY = startY - rect.top;
+            touchOffsetX = lastX - rect.left;
+            touchOffsetY = lastY - rect.top;
 
             // Create Ghost
             dragGhost = card.cloneNode(true);
@@ -313,14 +315,19 @@ function setupLongPressDrag(card) {
             document.getElementById('trash-zone').classList.add('visible');
 
             // Position ghost at current touch position
-            moveGhost(startX, startY);
+            moveGhost(lastX, lastY);
         }, LONG_PRESS_DURATION);
-    }, { passive: false });
+    }, { passive: true }); // Use passive: true to allow scrolling until drag starts
 
     card.addEventListener('touchmove', function (e) {
+        const touch = e.touches[0];
+
+        // Always update last position
+        lastX = touch.clientX;
+        lastY = touch.clientY;
+
         // Cancel long press if moved too much before it triggered
         if (longPressTimer && !isDragging) {
-            const touch = e.touches[0];
             const dx = Math.abs(touch.clientX - startX);
             const dy = Math.abs(touch.clientY - startY);
             if (dx > 10 || dy > 10) {
