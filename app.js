@@ -264,24 +264,36 @@ function setupPointerDrag(handle, card) {
 function setupLongPressDrag(card) {
     let startX, startY;
     let isDragging = false;
+    let pointerId = null;
 
     card.addEventListener('pointerdown', function (e) {
-        // Don't trigger on checkbox, buttons, or editable text
-        if (e.target.matches('input, button, .copy-btn') ||
-            e.target.closest('.task-text')?.hasAttribute('contenteditable')) {
+        // Don't trigger on checkbox or buttons (but DO allow on editable text for long press)
+        if (e.target.matches('input, button, .copy-btn')) {
             return;
         }
 
         startX = e.clientX;
         startY = e.clientY;
         isDragging = false;
+        pointerId = e.pointerId;
+
+        // Capture pointer to prevent scroll
+        card.setPointerCapture(e.pointerId);
 
         // Start long press timer
         longPressTimer = setTimeout(() => {
             isDragging = true;
 
+            // Prevent text from being focused
+            const taskText = card.querySelector('.task-text');
+            if (taskText) taskText.blur();
+
             // Haptic feedback if available
             if (navigator.vibrate) navigator.vibrate(50);
+
+            // Prevent scrolling during drag
+            document.body.style.touchAction = 'none';
+            document.body.style.overflow = 'hidden';
 
             // Start drag
             dragSourceEl = card;
@@ -294,8 +306,8 @@ function setupLongPressDrag(card) {
             dragGhost.classList.add('dragging-ghost');
             dragGhost.style.width = rect.width + 'px';
             dragGhost.style.height = rect.height + 'px';
-            const taskText = dragGhost.querySelector('.task-text');
-            if (taskText) taskText.removeAttribute('contenteditable');
+            const ghostText = dragGhost.querySelector('.task-text');
+            if (ghostText) ghostText.removeAttribute('contenteditable');
             document.body.appendChild(dragGhost);
 
             // Mark as placeholder
@@ -312,7 +324,7 @@ function setupLongPressDrag(card) {
             document.addEventListener('pointerup', onLongPressUp);
             document.addEventListener('pointercancel', onLongPressUp);
         }, LONG_PRESS_DURATION);
-    });
+    }, { passive: false });
 
     card.addEventListener('pointermove', function (e) {
         // Cancel long press if moved too much before it triggered
@@ -326,17 +338,25 @@ function setupLongPressDrag(card) {
         }
     });
 
-    card.addEventListener('pointerup', function () {
+    card.addEventListener('pointerup', function (e) {
         if (longPressTimer) {
             clearTimeout(longPressTimer);
             longPressTimer = null;
         }
+        if (pointerId !== null) {
+            try { card.releasePointerCapture(pointerId); } catch (err) { }
+            pointerId = null;
+        }
     });
 
-    card.addEventListener('pointercancel', function () {
+    card.addEventListener('pointercancel', function (e) {
         if (longPressTimer) {
             clearTimeout(longPressTimer);
             longPressTimer = null;
+        }
+        if (pointerId !== null) {
+            try { card.releasePointerCapture(pointerId); } catch (err) { }
+            pointerId = null;
         }
     });
 
@@ -402,6 +422,10 @@ function setupLongPressDrag(card) {
         document.removeEventListener('pointermove', onLongPressMove);
         document.removeEventListener('pointerup', onLongPressUp);
         document.removeEventListener('pointercancel', onLongPressUp);
+
+        // Restore scroll behavior
+        document.body.style.touchAction = '';
+        document.body.style.overflow = '';
 
         const trashZone = document.getElementById('trash-zone');
         const isTrash = trashZone.classList.contains('active');

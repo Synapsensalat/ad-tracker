@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ad-tracker-v6'; // v6: Mobile long-press drag
+const CACHE_NAME = 'ad-tracker-v7'; // v7: Fixed mobile scroll during drag
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
