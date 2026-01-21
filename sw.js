@@ -1,7 +1,9 @@
-const CACHE_NAME = 'ad-tracker-v2'; // Changed version number to force update
+const CACHE_NAME = 'ad-tracker-v3'; // Updated for new file structure
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
+  './styles.css',
+  './app.js',
   './data.csv',
   './manifest.json',
   './android-chrome-192x192.png',
