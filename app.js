@@ -260,46 +260,42 @@ function setupPointerDrag(handle, card) {
     }
 }
 
-// --- Long Press Drag for Mobile ---
+// --- Long Press Drag for Mobile (using touch events) ---
 function setupLongPressDrag(card) {
     let startX, startY;
     let isDragging = false;
-    let pointerId = null;
+    let currentTouch = null;
 
-    card.addEventListener('pointerdown', function (e) {
-        // Don't trigger on checkbox or buttons (but DO allow on editable text for long press)
+    card.addEventListener('touchstart', function (e) {
+        // Don't trigger on checkbox or buttons
         if (e.target.matches('input, button, .copy-btn')) {
             return;
         }
 
-        startX = e.clientX;
-        startY = e.clientY;
+        const touch = e.touches[0];
+        startX = touch.clientX;
+        startY = touch.clientY;
         isDragging = false;
-        pointerId = e.pointerId;
-
-        // Capture pointer to prevent scroll
-        card.setPointerCapture(e.pointerId);
+        currentTouch = touch;
 
         // Start long press timer
         longPressTimer = setTimeout(() => {
             isDragging = true;
 
-            // Prevent text from being focused
-            const taskText = card.querySelector('.task-text');
-            if (taskText) taskText.blur();
+            // Prevent text from being focused - blur any focused element
+            document.activeElement?.blur();
+
+            // Prevent context menu
+            e.preventDefault();
 
             // Haptic feedback if available
             if (navigator.vibrate) navigator.vibrate(50);
 
-            // Prevent scrolling during drag
-            document.body.style.touchAction = 'none';
-            document.body.style.overflow = 'hidden';
-
             // Start drag
             dragSourceEl = card;
             const rect = card.getBoundingClientRect();
-            touchOffsetX = e.clientX - rect.left;
-            touchOffsetY = e.clientY - rect.top;
+            touchOffsetX = startX - rect.left;
+            touchOffsetY = startY - rect.top;
 
             // Create Ghost
             dragGhost = card.cloneNode(true);
@@ -316,117 +312,112 @@ function setupLongPressDrag(card) {
             // Show trash
             document.getElementById('trash-zone').classList.add('visible');
 
-            // Position ghost
-            moveGhost(e.clientX, e.clientY);
-
-            // Bind move/up handlers
-            document.addEventListener('pointermove', onLongPressMove, { passive: false });
-            document.addEventListener('pointerup', onLongPressUp);
-            document.addEventListener('pointercancel', onLongPressUp);
+            // Position ghost at current touch position
+            moveGhost(startX, startY);
         }, LONG_PRESS_DURATION);
     }, { passive: false });
 
-    card.addEventListener('pointermove', function (e) {
+    card.addEventListener('touchmove', function (e) {
         // Cancel long press if moved too much before it triggered
         if (longPressTimer && !isDragging) {
-            const dx = Math.abs(e.clientX - startX);
-            const dy = Math.abs(e.clientY - startY);
+            const touch = e.touches[0];
+            const dx = Math.abs(touch.clientX - startX);
+            const dy = Math.abs(touch.clientY - startY);
             if (dx > 10 || dy > 10) {
                 clearTimeout(longPressTimer);
                 longPressTimer = null;
             }
+            return;
         }
-    });
 
-    card.addEventListener('pointerup', function (e) {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }
-        if (pointerId !== null) {
-            try { card.releasePointerCapture(pointerId); } catch (err) { }
-            pointerId = null;
-        }
-    });
+        // If dragging, handle the drag
+        if (isDragging && dragGhost) {
+            e.preventDefault(); // Prevent scroll during drag
 
-    card.addEventListener('pointercancel', function (e) {
-        if (longPressTimer) {
-            clearTimeout(longPressTimer);
-            longPressTimer = null;
-        }
-        if (pointerId !== null) {
-            try { card.releasePointerCapture(pointerId); } catch (err) { }
-            pointerId = null;
-        }
-    });
+            const touch = e.touches[0];
+            moveGhost(touch.clientX, touch.clientY);
 
-    function onLongPressMove(e) {
-        e.preventDefault();
-        moveGhost(e.clientX, e.clientY);
+            const trashZone = document.getElementById('trash-zone');
+            const trashRect = trashZone.getBoundingClientRect();
 
-        const trashZone = document.getElementById('trash-zone');
-        const trashRect = trashZone.getBoundingClientRect();
+            if (touch.clientY > trashRect.top) {
+                trashZone.classList.add('active');
+                dragGhost.classList.add('deleting');
+                dragSourceEl.style.display = 'none';
+                clearInterval(autoScrollInterval);
+            } else {
+                trashZone.classList.remove('active');
+                dragGhost.classList.remove('deleting');
+                dragSourceEl.style.display = '';
 
-        if (e.clientY > trashRect.top) {
-            trashZone.classList.add('active');
-            dragGhost.classList.add('deleting');
-            dragSourceEl.style.display = 'none';
-            clearInterval(autoScrollInterval);
-        } else {
-            trashZone.classList.remove('active');
-            dragGhost.classList.remove('deleting');
-            dragSourceEl.style.display = '';
+                // Geometric reordering
+                const container = document.getElementById('challenge-list');
+                const siblings = Array.from(container.children);
 
-            // Geometric reordering
-            const container = document.getElementById('challenge-list');
-            const siblings = Array.from(container.children);
+                let closestElement = null;
+                let minDistance = Infinity;
 
-            let closestElement = null;
-            let minDistance = Infinity;
+                siblings.forEach(sibling => {
+                    if (sibling === dragSourceEl) return;
 
-            siblings.forEach(sibling => {
-                if (sibling === dragSourceEl) return;
+                    const box = sibling.getBoundingClientRect();
+                    const boxCenterY = box.top + box.height / 2;
+                    const distance = touch.clientY - boxCenterY;
 
-                const box = sibling.getBoundingClientRect();
-                const boxCenterY = box.top + box.height / 2;
-                const distance = e.clientY - boxCenterY;
+                    if (touch.clientY > box.top && touch.clientY < box.bottom) {
+                        if (Math.abs(distance) < minDistance) {
+                            minDistance = Math.abs(distance);
+                            closestElement = sibling;
+                        }
+                    }
+                });
 
-                if (e.clientY > box.top && e.clientY < box.bottom) {
-                    if (Math.abs(distance) < minDistance) {
-                        minDistance = Math.abs(distance);
-                        closestElement = sibling;
+                if (closestElement) {
+                    const rect = closestElement.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+
+                    if (touch.clientY < midY) {
+                        if (dragSourceEl.nextElementSibling !== closestElement) {
+                            container.insertBefore(dragSourceEl, closestElement);
+                        }
+                    } else {
+                        if (dragSourceEl.previousElementSibling !== closestElement) {
+                            container.insertBefore(dragSourceEl, closestElement.nextSibling);
+                        }
                     }
                 }
-            });
 
-            if (closestElement) {
-                const rect = closestElement.getBoundingClientRect();
-                const midY = rect.top + rect.height / 2;
-
-                if (e.clientY < midY) {
-                    if (dragSourceEl.nextElementSibling !== closestElement) {
-                        container.insertBefore(dragSourceEl, closestElement);
-                    }
-                } else {
-                    if (dragSourceEl.previousElementSibling !== closestElement) {
-                        container.insertBefore(dragSourceEl, closestElement.nextSibling);
-                    }
-                }
+                handleAutoScroll(touch.clientY);
             }
-
-            handleAutoScroll(e.clientY);
         }
-    }
+    }, { passive: false });
 
-    function onLongPressUp() {
-        document.removeEventListener('pointermove', onLongPressMove);
-        document.removeEventListener('pointerup', onLongPressUp);
-        document.removeEventListener('pointercancel', onLongPressUp);
+    card.addEventListener('touchend', function (e) {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
 
-        // Restore scroll behavior
-        document.body.style.touchAction = '';
-        document.body.style.overflow = '';
+        if (isDragging) {
+            e.preventDefault();
+            finishDrag();
+        }
+        isDragging = false;
+    });
 
+    card.addEventListener('touchcancel', function () {
+        if (longPressTimer) {
+            clearTimeout(longPressTimer);
+            longPressTimer = null;
+        }
+
+        if (isDragging) {
+            finishDrag();
+        }
+        isDragging = false;
+    });
+
+    function finishDrag() {
         const trashZone = document.getElementById('trash-zone');
         const isTrash = trashZone.classList.contains('active');
 
