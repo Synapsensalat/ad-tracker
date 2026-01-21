@@ -1,1 +1,1 @@
-# ad-tracker
+https://synapsensalat.github.io/ad-tracker/
