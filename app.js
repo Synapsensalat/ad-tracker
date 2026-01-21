@@ -149,14 +149,16 @@ function setupPointerDrag(handle, card) {
         // Check Trash Collision
         if (e.clientY > trashRect.top) {
             trashZone.classList.add('active');
-            dragGhost.style.opacity = '0.5';
-            dragGhost.style.border = '2px solid red';
+            dragGhost.classList.add('deleting');
+            // Hide placeholder when over trash (we're deleting, not reordering)
+            dragSourceEl.style.display = 'none';
             // Stop scrolling when over trash
             clearInterval(autoScrollInterval);
         } else {
             trashZone.classList.remove('active');
-            dragGhost.style.opacity = '0.95';
-            dragGhost.style.border = '1px solid var(--accent)';
+            dragGhost.classList.remove('deleting');
+            // Show placeholder again
+            dragSourceEl.style.display = '';
 
             // --- Geometric Reordering ---
             const container = document.getElementById('challenge-list');

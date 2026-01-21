@@ -100,6 +100,15 @@ h1 {
     top: 0;
     left: 0;
     will-change: top, left;
+    transition: opacity 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+/* Delete mode styling for ghost */
+.card.dragging-ghost.deleting {
+    opacity: 0.6;
+    border: 3px solid #ff4444;
+    background: linear-gradient(135deg, #2c2c2c 0%, #3d1a1a 100%);
+    box-shadow: 0 15px 30px rgba(255, 0, 0, 0.3);
 }
 
 /* Placeholder styling (the hole in the list) */
